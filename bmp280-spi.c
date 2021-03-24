@@ -3,13 +3,16 @@
 #include <linux/fs.h>
 #include <linux/cdev.h>
 #include <linux/uaccess.h>
+#include <linux/spi/spi.h>
 
 #define DRIVER_NAME "bmp280-spi-drv"
 #define DRIVER_CLASS "bmp280-spi-class"
+#define SPI_BUS_NUM 0
 
 static dev_t device_nbr;
 static struct class *device_class;
 static struct cdev c_device;
+static struct spi_device *bmp280_dev;
 
 static int bmp280_spi_open(struct inode *pinode, struct file *pfile)
 {
@@ -31,6 +34,41 @@ static struct file_operations bmp280_spi_fops = {
 
 static int bmp280_spi_init(void)
 {
+	struct spi_master *master;
+	u8 chip_id;
+
+	struct spi_board_info spi_device_info = {
+		.modalias = "bmp280",
+		.max_speed_hz = 1000000,
+		.bus_num = SPI_BUS_NUM,
+		.chip_select = 0,
+		.mode = 3,
+	};
+
+	master = spi_busnum_to_master(SPI_BUS_NUM);
+
+	if (!master) {
+		printk("%s - There is no spi bus with nbr %d\n", DRIVER_NAME,
+		       SPI_BUS_NUM);
+		return -1;
+	}
+
+	bmp280_dev = spi_new_device(master, &spi_device_info);
+	if (!bmp280_dev) {
+		printk("%s - Cannot create spi device\n", DRIVER_NAME);
+		return -1;
+	}
+	bmp280_dev->bits_per_word = 8;
+
+	if (spi_setup(bmp280_dev) != 0) {
+		printk("%s - Cannot change spi bus setup\n", DRIVER_NAME);
+		spi_unregister_device(bmp280_dev);
+		return -1;
+	}
+
+	chip_id = spi_w8r8(bmp280_dev, 0xD0);
+	printk("%s - Chip id: 0x%x\n", DRIVER_NAME, chip_id);
+
 	printk(KERN_INFO "%s - Initialization started.\n", DRIVER_NAME);
 
 	if (alloc_chrdev_region(&device_nbr, 0, 1, DRIVER_NAME) < 0) {
@@ -53,7 +91,6 @@ static int bmp280_spi_init(void)
 	}
 	cdev_init(&c_device, &bmp280_spi_fops);
 
-	/* Registering device to kernel */
 	if (cdev_add(&c_device, device_nbr, 1) == -1) {
 		printk("%s - Registering of device to kernel failed.\n",
 		       DRIVER_NAME);
@@ -74,6 +111,9 @@ ClassError:
 
 static void bmp280_spi_exit(void)
 {
+	if (bmp280_dev)
+		spi_unregister_device(bmp280_dev);
+
 	cdev_del(&c_device);
 	device_destroy(device_class, device_nbr);
 	class_destroy(device_class);
