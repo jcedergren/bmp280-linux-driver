@@ -32,10 +32,9 @@ static struct file_operations bmp280_spi_fops = {
 	.release = bmp280_spi_close,
 };
 
-static int bmp280_spi_init(void)
+static int __init setup_spi(void)
 {
 	struct spi_master *master;
-	u8 chip_id;
 
 	struct spi_board_info spi_device_info = {
 		.modalias = "bmp280",
@@ -66,11 +65,11 @@ static int bmp280_spi_init(void)
 		return -1;
 	}
 
-	chip_id = spi_w8r8(bmp280_dev, 0xD0);
-	printk("%s - Chip id: 0x%x\n", DRIVER_NAME, chip_id);
+	return 0;
+}
 
-	printk(KERN_INFO "%s - Initialization started.\n", DRIVER_NAME);
-
+static int __init setup_ch_dev(void)
+{
 	if (alloc_chrdev_region(&device_nbr, 0, 1, DRIVER_NAME) < 0) {
 		printk("%s - Device nbr could not be allocated.\n",
 		       DRIVER_NAME);
@@ -96,8 +95,6 @@ static int bmp280_spi_init(void)
 		       DRIVER_NAME);
 		goto AddError;
 	}
-	printk(KERN_INFO "%s - Initialization complete.\n", DRIVER_NAME);
-
 	return 0;
 
 AddError:
@@ -107,6 +104,19 @@ FileError:
 ClassError:
 	unregister_chrdev_region(device_nbr, 1);
 	return -1;
+}
+
+static int __init bmp280_spi_init(void)
+{
+	printk(KERN_INFO "%s - Initialization started.\n", DRIVER_NAME);
+	if (setup_spi() == -1)
+		return -1;
+
+	if (setup_ch_dev() == -1)
+		return -1;
+	printk(KERN_INFO "%s - Initialization successful.\n", DRIVER_NAME);
+
+	return 0;
 }
 
 static void bmp280_spi_exit(void)
