@@ -26,10 +26,38 @@ static int bmp280_spi_close(struct inode *inode, struct file *pfile)
 	return 0;
 }
 
+static int bmp280_spi_read(struct file *pfile, char __user *user_buffer,
+			   size_t len, loff_t *offset)
+{
+	int bytes_to_copy, bytes_not_copied;
+	int temperature;
+	char output_string[20];
+
+	memset(output_string, 0, sizeof(output_string));
+	temperature = 12345;
+
+	if (sizeof(output_string) <= *offset) {
+		return 0;
+	}
+
+	bytes_to_copy = min(sizeof(output_string - *offset), len);
+
+	snprintf(output_string, sizeof(output_string), "%d\n", temperature);
+
+	bytes_not_copied = copy_to_user(user_buffer, output_string + *offset,
+					bytes_to_copy);
+
+	*offset += bytes_to_copy;
+
+	printk(KERN_NOTICE "BMP280_spi read\n");
+	return bytes_to_copy;
+}
+
 static struct file_operations bmp280_spi_fops = {
 	.owner = THIS_MODULE,
 	.open = bmp280_spi_open,
 	.release = bmp280_spi_close,
+	.read = bmp280_spi_read,
 };
 
 static int __init setup_spi(void)
