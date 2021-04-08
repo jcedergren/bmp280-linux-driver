@@ -9,10 +9,18 @@
 #define DRIVER_CLASS "bmp280-spi-class"
 #define SPI_BUS_NUM 0
 
+#define T_STANDBY_1S 0b101
+#define OSRS_T_16 0b101
+#define OSRS_P_16 0b101
+#define MODE_NORMAL 0b11
+#define ADR_CONFIG 0xF5
+#define ADR_CTRL_MEAS 0xF4
+
 static dev_t device_nbr;
 static struct class *device_class;
 static struct cdev c_device;
 static struct spi_device *bmp280_dev;
+static s32 dig_T1, dig_T2, dig_T3;
 
 static int bmp280_spi_open(struct inode *pinode, struct file *pfile)
 {
@@ -134,6 +142,27 @@ ClassError:
 	return -1;
 }
 
+static int __init setup_sensor(void)
+{
+	u8 conf_msg[2];
+	u8 ctrl_meas_msg[2];
+
+	conf_msg[0] = ADR_CONFIG & ~(1 << 7);
+	conf_msg[1] = (T_STANDBY_1S << 5);
+	ctrl_meas_msg[0] = ADR_CTRL_MEAS & ~(1 << 7);
+	ctrl_meas_msg[1] =
+		(OSRS_T_16 << 5) | (OSRS_P_16 << 2) | (MODE_NORMAL << 0);
+
+	spi_write(bmp280_dev, conf_msg, sizeof(conf_msg));
+	spi_write(bmp280_dev, ctrl_meas_msg, sizeof(ctrl_meas_msg));
+
+	dig_T1 = spi_w8r8(bmp280_dev, 0x88);
+	dig_T2 = spi_w8r8(bmp280_dev, 0x8a);
+	dig_T3 = spi_w8r8(bmp280_dev, 0x8c);
+
+	return 1;
+}
+
 static int __init bmp280_spi_init(void)
 {
 	printk(KERN_INFO "%s - Initialization started.\n", DRIVER_NAME);
@@ -141,6 +170,9 @@ static int __init bmp280_spi_init(void)
 		return -1;
 
 	if (setup_ch_dev() == -1)
+		return -1;
+
+	if (setup_sensor() == -1)
 		return -1;
 	printk(KERN_INFO "%s - Initialization successful.\n", DRIVER_NAME);
 
