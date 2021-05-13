@@ -34,6 +34,17 @@ static int bmp280_spi_close(struct inode *inode, struct file *pfile)
 	return 0;
 }
 
+static s32 read_raw_adc_temp(void)
+{
+	s32 temp_msb, temp_lsb, temp_xlsb;
+
+	temp_msb = spi_w8r8(bmp280_dev, 0xFA);
+	temp_lsb = spi_w8r8(bmp280_dev, 0xFB);
+	temp_xlsb = spi_w8r8(bmp280_dev, 0xFC);
+
+	return ((temp_msb << 16) | (temp_lsb << 8) | temp_xlsb) >> 4;
+}
+
 static int bmp280_spi_read(struct file *pfile, char __user *user_buffer,
 			   size_t len, loff_t *offset)
 {
