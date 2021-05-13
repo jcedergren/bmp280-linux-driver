@@ -63,11 +63,12 @@ static int bmp280_spi_read(struct file *pfile, char __user *user_buffer,
 			   size_t len, loff_t *offset)
 {
 	int bytes_to_copy, bytes_not_copied;
-	int temperature;
+	s32 temperature;
 	char output_string[20];
 
 	memset(output_string, 0, sizeof(output_string));
-	temperature = 12345;
+	temperature = read_raw_adc_temp();
+	temperature = calibration_compensation_temp(temperature);
 
 	if (sizeof(output_string) <= *offset) {
 		return 0;
@@ -75,7 +76,8 @@ static int bmp280_spi_read(struct file *pfile, char __user *user_buffer,
 
 	bytes_to_copy = min(sizeof(output_string - *offset), len);
 
-	snprintf(output_string, sizeof(output_string), "%d\n", temperature);
+	snprintf(output_string, sizeof(output_string), "%d.%d\n",
+		 temperature / 100, temperature % 100);
 
 	bytes_not_copied = copy_to_user(user_buffer, output_string + *offset,
 					bytes_to_copy);
