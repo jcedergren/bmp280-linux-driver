@@ -181,9 +181,9 @@ static int __init setup_sensor(void)
 	spi_write(bmp280_dev, conf_msg, sizeof(conf_msg));
 	spi_write(bmp280_dev, ctrl_meas_msg, sizeof(ctrl_meas_msg));
 
-	dig_T1 = spi_w8r8(bmp280_dev, 0x88);
-	dig_T2 = spi_w8r8(bmp280_dev, 0x8a);
-	dig_T3 = spi_w8r8(bmp280_dev, 0x8c);
+	dig_T1 = spi_w8r16(bmp280_dev, 0x88);
+	dig_T2 = spi_w8r16(bmp280_dev, 0x8a);
+	dig_T3 = spi_w8r16(bmp280_dev, 0x8c);
 
 	return 1;
 }
