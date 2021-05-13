@@ -21,6 +21,7 @@ static struct class *device_class;
 static struct cdev c_device;
 static struct spi_device *bmp280_dev;
 static s32 dig_T1, dig_T2, dig_T3;
+static s32 t_fine;
 
 static int bmp280_spi_open(struct inode *pinode, struct file *pfile)
 {
@@ -32,6 +33,19 @@ static int bmp280_spi_close(struct inode *inode, struct file *pfile)
 {
 	printk(KERN_NOTICE "BMP280_spi closed\n");
 	return 0;
+}
+
+static s32 calibration_compensation_temp(s32 adc_T)
+{
+	s32 var1, var2, T;
+	var1 = ((((adc_T >> 3) - (dig_T1 << 1))) * (dig_T2)) >> 11;
+	var2 = (((((adc_T >> 4) - (dig_T1)) * ((adc_T >> 4) - (dig_T1))) >>
+		 12) *
+		(dig_T3)) >>
+	       14;
+	t_fine = var1 + var2;
+	T = (t_fine * 5 + 128) >> 8;
+	return T;
 }
 
 static s32 read_raw_adc_temp(void)
